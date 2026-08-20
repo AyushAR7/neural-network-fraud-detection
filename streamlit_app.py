@@ -2,11 +2,8 @@
 Step 11: Streamlit Frontend
 Neural Network from Scratch + Fraud Detection
 
-A simple demo UI that calls the FastAPI backend's /predict and /model-info
-endpoints. Run the FastAPI server first (uvicorn app:app --reload), then
-run this in a separate terminal.
-
-Run with: streamlit run streamlit_app.py
+A demo UI that calls the FastAPI backend's /predict and /model-info
+endpoints hosted on Render.
 """
 
 import streamlit as st
@@ -25,7 +22,10 @@ st.caption(
 # ---- Model info panel ----
 with st.expander("ℹ️ Model details", expanded=False):
     try:
-        info = requests.get(f"{API_URL}/model-info", timeout=5).json()
+        response = requests.get(f"{API_URL}/model-info", timeout=60)
+        response.raise_for_status()
+        info = response.json()
+        
         col1, col2 = st.columns(2)
         with col1:
             st.metric("Architecture", info["architecture"])
@@ -41,8 +41,8 @@ with st.expander("ℹ️ Model details", expanded=False):
         mcol2.metric("Recall", f"{m['recall']:.3f}")
         mcol3.metric("F1", f"{m['f1']:.3f}")
         mcol4.metric("PR-AUC", f"{m['pr_auc']:.3f}")
-    except requests.exceptions.ConnectionError:
-        st.error("Can't reach the API. Make sure `uvicorn app:app --reload` is running.")
+    except requests.exceptions.RequestException:
+        st.warning("⚠️ Backend is spinning up on Render. Please allow ~30 seconds for cold start.")
 
 st.divider()
 
@@ -83,9 +83,10 @@ if submitted:
     }
 
     try:
-        response = requests.post(f"{API_URL}/predict", json=payload, timeout=5)
-        response.raise_for_status()
-        result = response.json()
+        with st.spinner("Analyzing transaction with cloud PyTorch model..."):
+            response = requests.post(f"{API_URL}/predict", json=payload, timeout=60)
+            response.raise_for_status()
+            result = response.json()
 
         probability = result["fraud_probability"]
         flagged = result["flagged_as_fraud"]
@@ -99,8 +100,5 @@ if submitted:
         st.progress(min(probability, 1.0))
         st.caption(f"Decision threshold: {result['decision_threshold']}")
 
-    except requests.exceptions.ConnectionError:
-        st.error("Can't reach the API. Make sure `uvicorn app:app --reload` is running on port 8000.")
-    except requests.exceptions.HTTPError as e:
-        st.error(f"API returned an error: {e}")
-        
+    except requests.exceptions.RequestException as e:
+        st.error(f"Could not complete prediction. Backend may be waking up: {e}")
