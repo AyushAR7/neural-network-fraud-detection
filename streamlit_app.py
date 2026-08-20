@@ -12,7 +12,7 @@ Run with: streamlit run streamlit_app.py
 import streamlit as st
 import requests
 
-API_URL = "http://127.0.0.1:8000"
+API_URL = "https://neural-network-fraud-detection.onrender.com"
 
 st.set_page_config(page_title="Fraud Detection Demo", page_icon="🔍", layout="centered")
 
